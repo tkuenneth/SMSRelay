@@ -3,8 +3,11 @@ package de.thomaskuenneth.smsrelay
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.provider.Telephony
+import android.provider.Telephony.Mms
 import android.provider.Telephony.Sms.Intents.getMessagesFromIntent
 import android.util.Log
+import java.lang.Thread.sleep
 import java.util.Properties
 import javax.mail.Authenticator
 import javax.mail.Message
@@ -18,8 +21,9 @@ import kotlin.concurrent.thread
 class Receiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         when (intent?.action) {
-            "android.provider.Telephony.SMS_RECEIVED" -> context.handleSms(intent)
-            "android.provider.Telephony.MMS_RECEIVED" -> handleMms(intent)
+            Telephony.Sms.Intents.SMS_RECEIVED_ACTION -> context.handleSms(intent)
+            Telephony.Sms.Intents.WAP_PUSH_RECEIVED_ACTION -> context.handleMms()
+
             else -> {
                 Log.e(TAG, "unexpected action")
             }
@@ -38,7 +42,38 @@ class Receiver : BroadcastReceiver() {
         }
     }
 
-    private fun handleMms(intent: Intent) {
+    private fun Context.handleMms() {
+        // This is hacky; we need to find a way to connect the id from the intent with
+        // the content provider
+        thread {
+            sleep(3000)
+            contentResolver.query(
+                Mms.Inbox.CONTENT_URI,
+                arrayOf(Mms.Inbox._ID),
+                null,
+                null,
+                Mms.Inbox.DEFAULT_SORT_ORDER
+            )?.let { cursorInbox ->
+                if (cursorInbox.moveToNext()) {
+                    val messageId = cursorInbox.getString(0)
+                    contentResolver.query(
+                        Mms.Part.CONTENT_URI,
+                        arrayOf(Mms.Part.MSG_ID, Mms.Part.CONTENT_TYPE, Mms.Part.TEXT),
+                        "${Mms.Part.MSG_ID} = ? AND ${Mms.Part.CONTENT_TYPE} = ?",
+                        arrayOf(messageId, "text/plain"),
+                        null
+                    )?.let { cursorPart ->
+                        if (cursorPart.moveToNext()) {
+                            val indexText = cursorPart.getColumnIndex(Mms.Part.TEXT)
+                            val text = cursorPart.getString(indexText)
+                            sendEmail("an MMS", text)
+                        }
+                        cursorPart.close()
+                    }
+                }
+                cursorInbox.close()
+            }
+        }
     }
 
     private fun sendEmail(subject: String, text: String) {

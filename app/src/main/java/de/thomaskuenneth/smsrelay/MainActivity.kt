@@ -29,7 +29,9 @@ class MainActivity : ComponentActivity() {
 
     private val flow = MutableStateFlow(false)
     private val permissions = arrayOf(
-        Manifest.permission.RECEIVE_SMS, Manifest.permission.RECEIVE_MMS
+        Manifest.permission.RECEIVE_SMS,
+        Manifest.permission.READ_SMS,
+        Manifest.permission.RECEIVE_MMS
     )
     private val launcher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
