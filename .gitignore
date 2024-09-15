@@ -21,3 +21,4 @@ local.properties
 .idea/gradle.xml
 .idea/compiler.xml
 .idea/vcs.xml
+**/Browse.plb
