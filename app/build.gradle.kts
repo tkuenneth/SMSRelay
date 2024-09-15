@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         applicationId = "de.thomaskuenneth.smsrelay"
-        minSdk = 34
+        minSdk = 28
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
