@@ -33,10 +33,7 @@ class Receiver : BroadcastReceiver() {
     private fun Context.handleSms(intent: Intent) {
         getMessagesFromIntent(intent)?.forEach { message ->
             sendEmail(
-                subject = getString(
-                    R.string.subject,
-                    message.originatingAddress ?: getString(R.string.unknown_sender)
-                ),
+                subject = getSubject(message.originatingAddress),
                 text = message.messageBody
             )
         }
@@ -47,32 +44,7 @@ class Receiver : BroadcastReceiver() {
         // the content provider
         thread {
             sleep(3000)
-            contentResolver.query(
-                Mms.Inbox.CONTENT_URI,
-                arrayOf(Mms.Inbox._ID),
-                null,
-                null,
-                Mms.Inbox.DEFAULT_SORT_ORDER
-            )?.let { cursorInbox ->
-                if (cursorInbox.moveToNext()) {
-                    val messageId = cursorInbox.getString(0)
-                    contentResolver.query(
-                        Mms.Part.CONTENT_URI,
-                        arrayOf(Mms.Part.MSG_ID, Mms.Part.CONTENT_TYPE, Mms.Part.TEXT),
-                        "${Mms.Part.MSG_ID} = ? AND ${Mms.Part.CONTENT_TYPE} = ?",
-                        arrayOf(messageId, "text/plain"),
-                        null
-                    )?.let { cursorPart ->
-                        if (cursorPart.moveToNext()) {
-                            val indexText = cursorPart.getColumnIndex(Mms.Part.TEXT)
-                            val text = cursorPart.getString(indexText)
-                            sendEmail("an MMS", text)
-                        }
-                        cursorPart.close()
-                    }
-                }
-                cursorInbox.close()
-            }
+            getLatestMMS { subject, text -> sendEmail(subject = subject, text = text) }
         }
     }
 
@@ -111,3 +83,51 @@ class Receiver : BroadcastReceiver() {
         val TAG: String = Receiver::class.java.simpleName
     }
 }
+
+fun Context.getLatestMMS(callback: (String, String) -> Unit) {
+    var text = getString(R.string.unknown)
+    var subject = getString(R.string.unknown)
+    contentResolver.query(
+        Mms.CONTENT_URI,
+        arrayOf(Mms._ID),
+        null,
+        null,
+        Mms.Inbox.DEFAULT_SORT_ORDER
+    )?.let { cursorInbox ->
+        if (cursorInbox.moveToNext()) {
+            val messageId = cursorInbox.getString(0)
+            contentResolver.query(
+                Mms.Part.CONTENT_URI,
+                arrayOf(Mms.Part.MSG_ID, Mms.Part.CONTENT_TYPE, Mms.Part.TEXT),
+                "${Mms.Part.MSG_ID} = ? AND ${Mms.Part.CONTENT_TYPE} = ?",
+                arrayOf(messageId, "text/plain"),
+                null
+            )?.let { cursorPart ->
+                if (cursorPart.moveToNext()) {
+                    val indexText = cursorPart.getColumnIndex(Mms.Part.TEXT)
+                    text = cursorPart.getString(indexText)
+                }
+                contentResolver.query(
+                    Mms.Addr.getAddrUriForMessage(messageId),
+                    arrayOf(Mms.Addr.ADDRESS),
+                    null,
+                    null,
+                    null
+                )?.let { cursorAdr ->
+                    if (cursorAdr.moveToNext()) {
+                        subject = getSubject(cursorAdr.getString(0))
+                    }
+                    cursorAdr.close()
+                }
+                cursorPart.close()
+            }
+        }
+        cursorInbox.close()
+    }
+    callback(subject, text)
+}
+
+private fun Context.getSubject(address: String?) = getString(
+    R.string.subject,
+    if (address?.isNotEmpty() == true) address else getString(R.string.unknown_sender)
+)

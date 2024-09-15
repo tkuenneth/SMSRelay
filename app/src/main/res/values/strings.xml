@@ -3,4 +3,5 @@
     <string name="not_granted">Not granted</string>
     <string name="subject">New message from %1$s</string>
     <string name="unknown_sender">unknown sender</string>
+    <string name="unknown">unknown</string>
 </resources>
