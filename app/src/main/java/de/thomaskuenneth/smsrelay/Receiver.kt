@@ -3,20 +3,29 @@ package de.thomaskuenneth.smsrelay
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.Telephony
 import android.provider.Telephony.Mms
 import android.provider.Telephony.Sms.Intents.getMessagesFromIntent
 import android.util.Log
+import de.thomaskuenneth.smsrelay.Receiver.Companion.TAG
+import java.io.ByteArrayInputStream
 import java.lang.Thread.sleep
 import java.util.Properties
+import javax.activation.DataHandler
 import javax.mail.Authenticator
+import javax.mail.FolderNotFoundException
 import javax.mail.Message
 import javax.mail.PasswordAuthentication
 import javax.mail.Session
 import javax.mail.Transport
 import javax.mail.internet.InternetAddress
+import javax.mail.internet.MimeBodyPart
 import javax.mail.internet.MimeMessage
+import javax.mail.internet.MimeMultipart
+import javax.mail.util.ByteArrayDataSource
 import kotlin.concurrent.thread
+
 
 class Receiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -34,7 +43,8 @@ class Receiver : BroadcastReceiver() {
         getMessagesFromIntent(intent)?.forEach { message ->
             sendEmail(
                 subject = getSubject(message.originatingAddress),
-                text = message.messageBody
+                text = message.messageBody,
+                images = emptyList()
             )
         }
     }
@@ -44,37 +54,10 @@ class Receiver : BroadcastReceiver() {
         // the content provider
         thread {
             sleep(3000)
-            getLatestMMS { subject, text -> sendEmail(subject = subject, text = text) }
-        }
-    }
-
-    private fun sendEmail(subject: String, text: String) {
-        thread {
-            val props = Properties()
-            props["mail.smtp.host"] = BuildConfig.SMTP_HOST
-            props["mail.smtp.port"] = BuildConfig.SMTP_PORT
-            props["mail.smtp.auth"] = true
-            props["mail.smtp.starttls.enable"] = true
-            props["mail.smtp.socketFactory.class"] = "javax.net.ssl.SSLSocketFactory"
-            val auth = object : Authenticator() {
-                override fun getPasswordAuthentication(): PasswordAuthentication {
-                    return PasswordAuthentication(
-                        BuildConfig.SMTP_USERNAME, BuildConfig.SMTP_PASSWORD
-                    )
-                }
-            }
-            try {
-                MimeMessage(Session.getInstance(props, auth)).run {
-                    setFrom(InternetAddress(BuildConfig.SMTP_FROM))
-                    setRecipients(
-                        Message.RecipientType.TO, InternetAddress.parse(BuildConfig.SMTP_TO)
-                    )
-                    setSubject(subject)
-                    setText(text)
-                    Transport.send(this)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "sendEmail()", e)
+            getLatestMMS { subject, text, images ->
+                sendEmail(
+                    subject = subject, text = text, images = images
+                )
             }
         }
     }
@@ -84,15 +67,57 @@ class Receiver : BroadcastReceiver() {
     }
 }
 
-fun Context.getLatestMMS(callback: (String, String) -> Unit) {
+fun sendEmail(subject: String, text: String, images: List<Pair<ByteArray, String>>) {
+    thread {
+        val props = Properties()
+        props["mail.smtp.host"] = BuildConfig.SMTP_HOST
+        props["mail.smtp.port"] = BuildConfig.SMTP_PORT
+        props["mail.smtp.auth"] = true
+        props["mail.smtp.starttls.enable"] = true
+        props["mail.smtp.socketFactory.class"] = "javax.net.ssl.SSLSocketFactory"
+        val auth = object : Authenticator() {
+            override fun getPasswordAuthentication(): PasswordAuthentication {
+                return PasswordAuthentication(
+                    BuildConfig.SMTP_USERNAME, BuildConfig.SMTP_PASSWORD
+                )
+            }
+        }
+        try {
+            MimeMessage(Session.getInstance(props, auth)).run {
+                setFrom(InternetAddress(BuildConfig.SMTP_FROM))
+                setRecipients(
+                    Message.RecipientType.TO, InternetAddress.parse(BuildConfig.SMTP_TO)
+                )
+                setSubject(subject)
+                val multipart = MimeMultipart()
+                val bodyPart = MimeBodyPart()
+                bodyPart.setText(text)
+                multipart.addBodyPart(bodyPart)
+                images.forEachIndexed { index, pair ->
+                    ByteArrayInputStream(pair.first).use {stream ->
+                        val messageBodyPart = MimeBodyPart()
+                        val mimeType = pair.second
+                        val ext = mimeType.split("/")[1]
+                        messageBodyPart.setDataHandler(DataHandler(ByteArrayDataSource(stream, mimeType)))
+                        messageBodyPart.fileName = "image_${1 + index}.$ext"
+                        multipart.addBodyPart(messageBodyPart)
+                    }
+                }
+                setContent(multipart)
+                Transport.send(this)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "sendEmail()", e)
+        }
+    }
+}
+
+fun Context.getLatestMMS(callback: (String, String, List<Pair<ByteArray, String>>) -> Unit) {
     var text = getString(R.string.unknown)
     var subject = getString(R.string.unknown)
+    val images = mutableListOf<Pair<ByteArray, String>>()
     contentResolver.query(
-        Mms.CONTENT_URI,
-        arrayOf(Mms._ID),
-        null,
-        null,
-        Mms.Inbox.DEFAULT_SORT_ORDER
+        Mms.CONTENT_URI, arrayOf(Mms._ID), null, null, Mms.Inbox.DEFAULT_SORT_ORDER
     )?.let { cursorInbox ->
         if (cursorInbox.moveToNext()) {
             val messageId = cursorInbox.getString(0)
@@ -117,6 +142,31 @@ fun Context.getLatestMMS(callback: (String, String) -> Unit) {
                     if (cursorAdr.moveToNext()) {
                         subject = getSubject(cursorAdr.getString(0))
                     }
+                    contentResolver.query(
+                        Mms.Part.CONTENT_URI,
+                        arrayOf(Mms._ID, Mms.Part.MSG_ID, Mms.Part.CONTENT_TYPE),
+                        "${Mms.Part.MSG_ID} = ? AND ${Mms.Part.CONTENT_TYPE} LIKE ?",
+                        arrayOf(messageId, "image/%"),
+                        null
+                    )?.let { cursorPartImage ->
+                        while (cursorPartImage.moveToNext()) {
+                            val partId = cursorPartImage.getString(0)
+                            val contentType = cursorPartImage.getString(2)
+                            try {
+                                contentResolver.openInputStream(
+                                    Uri.withAppendedPath(
+                                        Mms.Part.CONTENT_URI, partId
+                                    )
+                                ).use {
+                                    it?.readBytes()
+                                        ?.let { bytes -> images.add(Pair(bytes, contentType)) }
+                                }
+                            } catch (e: FolderNotFoundException) {
+                                Log.e(TAG, "openInputStream()", e)
+                            }
+                        }
+                        cursorPartImage.close()
+                    }
                     cursorAdr.close()
                 }
                 cursorPart.close()
@@ -124,7 +174,7 @@ fun Context.getLatestMMS(callback: (String, String) -> Unit) {
         }
         cursorInbox.close()
     }
-    callback(subject, text)
+    callback(subject, text, images)
 }
 
 private fun Context.getSubject(address: String?) = getString(
