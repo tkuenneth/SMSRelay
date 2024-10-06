@@ -22,3 +22,4 @@ local.properties
 .idea/compiler.xml
 .idea/vcs.xml
 **/Browse.plb
+.idea/studiobot.xml

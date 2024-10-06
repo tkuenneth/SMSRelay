@@ -30,11 +30,17 @@ import kotlinx.coroutines.flow.update
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        val TAG: String = MainActivity::class.java.simpleName
+    }
+
     private val flow = MutableStateFlow(false)
     private val permissions = arrayOf(
         Manifest.permission.RECEIVE_SMS,
         Manifest.permission.READ_SMS,
-        Manifest.permission.RECEIVE_MMS
+        Manifest.permission.RECEIVE_MMS,
+        Manifest.permission.READ_PHONE_STATE,
+        Manifest.permission.READ_CALL_LOG
     )
     private val launcher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->

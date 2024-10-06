@@ -1,10 +1,11 @@
 <resources>
     <string name="app_name">SMS Relay</string>
     <string name="grant_permissions">Please grant all requested permissions. Unfortunately, the app won\'t work otherwise.</string>
-    <string name="subject">New message from %1$s</string>
+    <string name="subject_new_message">New message from %1$s</string>
     <string name="unknown_sender">unknown sender</string>
     <string name="unknown">unknown</string>
     <string name="welcome">Welcome to %1$s</string>
     <string name="button_grant_permissions">Grant permissions</string>
     <string name="permissions_granted">Thank you for having granted all necessary permissions.</string>
+    <string name="subject_missed_call">Missed call from %1$s</string>
 </resources>

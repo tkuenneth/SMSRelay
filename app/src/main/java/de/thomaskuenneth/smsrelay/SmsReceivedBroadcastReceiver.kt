@@ -8,7 +8,8 @@ import android.provider.Telephony
 import android.provider.Telephony.Mms
 import android.provider.Telephony.Sms.Intents.getMessagesFromIntent
 import android.util.Log
-import de.thomaskuenneth.smsrelay.Receiver.Companion.TAG
+import androidx.annotation.StringRes
+import de.thomaskuenneth.smsrelay.SmsReceivedBroadcastReceiver.Companion.TAG
 import java.io.ByteArrayInputStream
 import java.lang.Thread.sleep
 import java.util.Properties
@@ -27,7 +28,7 @@ import javax.mail.util.ByteArrayDataSource
 import kotlin.concurrent.thread
 
 
-class Receiver : BroadcastReceiver() {
+class SmsReceivedBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         when (intent?.action) {
             Telephony.Sms.Intents.SMS_RECEIVED_ACTION -> context.handleSms(intent)
@@ -42,7 +43,7 @@ class Receiver : BroadcastReceiver() {
     private fun Context.handleSms(intent: Intent) {
         getMessagesFromIntent(intent)?.forEach { message ->
             sendEmail(
-                subject = getSubject(message.originatingAddress),
+                subject = getSubject(R.string.subject_new_message, message.originatingAddress),
                 text = message.messageBody,
                 images = emptyList()
             )
@@ -63,7 +64,7 @@ class Receiver : BroadcastReceiver() {
     }
 
     companion object {
-        val TAG: String = Receiver::class.java.simpleName
+        val TAG: String = SmsReceivedBroadcastReceiver::class.java.simpleName
     }
 }
 
@@ -94,11 +95,17 @@ fun sendEmail(subject: String, text: String, images: List<Pair<ByteArray, String
                 bodyPart.setText(text)
                 multipart.addBodyPart(bodyPart)
                 images.forEachIndexed { index, pair ->
-                    ByteArrayInputStream(pair.first).use {stream ->
+                    ByteArrayInputStream(pair.first).use { stream ->
                         val messageBodyPart = MimeBodyPart()
                         val mimeType = pair.second
                         val ext = mimeType.split("/")[1]
-                        messageBodyPart.setDataHandler(DataHandler(ByteArrayDataSource(stream, mimeType)))
+                        messageBodyPart.setDataHandler(
+                            DataHandler(
+                                ByteArrayDataSource(
+                                    stream, mimeType
+                                )
+                            )
+                        )
                         messageBodyPart.fileName = "image_${1 + index}.$ext"
                         multipart.addBodyPart(messageBodyPart)
                     }
@@ -140,7 +147,7 @@ fun Context.getLatestMMS(callback: (String, String, List<Pair<ByteArray, String>
                     null
                 )?.let { cursorAdr ->
                     if (cursorAdr.moveToNext()) {
-                        subject = getSubject(cursorAdr.getString(0))
+                        subject = getSubject(R.string.subject_new_message, cursorAdr.getString(0))
                     }
                     contentResolver.query(
                         Mms.Part.CONTENT_URI,
@@ -177,7 +184,6 @@ fun Context.getLatestMMS(callback: (String, String, List<Pair<ByteArray, String>
     callback(subject, text, images)
 }
 
-private fun Context.getSubject(address: String?) = getString(
-    R.string.subject,
-    if (address?.isNotEmpty() == true) address else getString(R.string.unknown_sender)
+fun Context.getSubject(@StringRes subject: Int, address: String?) = getString(
+    subject, if (address?.isNotEmpty() == true) address else getString(R.string.unknown_sender)
 )
