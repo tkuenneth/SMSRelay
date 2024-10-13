@@ -9,6 +9,7 @@ import android.provider.ContactsContract
 import android.provider.Telephony
 import android.provider.Telephony.Mms
 import android.provider.Telephony.Sms.Intents.getMessagesFromIntent
+import android.telephony.PhoneNumberUtils
 import android.util.Log
 import androidx.annotation.StringRes
 import de.thomaskuenneth.smsrelay.SmsReceivedBroadcastReceiver.Companion.TAG
@@ -189,18 +190,24 @@ fun Context.getSubject(@StringRes subject: Int, address: String?) = getString(
 
 @SuppressLint("Range")
 fun Context.getName(phoneNumber: String): String {
-    val projection = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
-    val selection = "${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?"
-    val selectionArgs = arrayOf("%$phoneNumber%")
+    val projection = arrayOf(
+        ContactsContract.CommonDataKinds.Phone.NUMBER,
+        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
+    )
+    val normalizedIncoming = PhoneNumberUtils.normalizeNumber(phoneNumber)
     contentResolver.query(
-        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-        projection,
-        selection,
-        selectionArgs,
-        null
+        ContactsContract.CommonDataKinds.Phone.CONTENT_URI, projection, null, null, null
     )?.use { cursor ->
-        if (cursor.moveToFirst()) {
-            return cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME))
+        while (cursor.moveToNext()) {
+            val number =
+                cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))
+            val normalizedCurrent = PhoneNumberUtils.normalizeNumber(number)
+            if (normalizedIncoming.contains(normalizedCurrent) || normalizedCurrent.contains(
+                    normalizedIncoming
+                )
+            ) {
+                return cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME))
+            }
         }
     }
     return phoneNumber
