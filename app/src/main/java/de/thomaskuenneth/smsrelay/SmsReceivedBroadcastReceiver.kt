@@ -1,9 +1,11 @@
 package de.thomaskuenneth.smsrelay
 
+import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.ContactsContract
 import android.provider.Telephony
 import android.provider.Telephony.Mms
 import android.provider.Telephony.Sms.Intents.getMessagesFromIntent
@@ -185,5 +187,25 @@ fun Context.getLatestMMS(callback: (String, String, List<Pair<ByteArray, String>
 }
 
 fun Context.getSubject(@StringRes subject: Int, address: String?) = getString(
-    subject, if (address?.isNotEmpty() == true) address else getString(R.string.unknown_sender)
+    subject,
+    if (address?.isNotEmpty() == true) getName(address) else getString(R.string.unknown_sender)
 )
+
+@SuppressLint("Range")
+fun Context.getName(phoneNumber: String): String {
+    val projection = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+    val selection = "${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?"
+    val selectionArgs = arrayOf("%$phoneNumber%")
+    contentResolver.query(
+        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+        projection,
+        selection,
+        selectionArgs,
+        null
+    )?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            return cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME))
+        }
+    }
+    return phoneNumber
+}

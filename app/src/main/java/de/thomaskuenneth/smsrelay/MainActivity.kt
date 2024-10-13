@@ -40,7 +40,8 @@ class MainActivity : ComponentActivity() {
         Manifest.permission.READ_SMS,
         Manifest.permission.RECEIVE_MMS,
         Manifest.permission.READ_PHONE_STATE,
-        Manifest.permission.READ_CALL_LOG
+        Manifest.permission.READ_CALL_LOG,
+        Manifest.permission.READ_CONTACTS
     )
     private val launcher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
