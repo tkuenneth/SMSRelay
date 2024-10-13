@@ -127,7 +127,7 @@ fun Context.getLatestMMS(callback: (String, String, List<Pair<ByteArray, String>
     val images = mutableListOf<Pair<ByteArray, String>>()
     contentResolver.query(
         Mms.CONTENT_URI, arrayOf(Mms._ID), null, null, Mms.Inbox.DEFAULT_SORT_ORDER
-    )?.let { cursorInbox ->
+    )?.use { cursorInbox ->
         if (cursorInbox.moveToNext()) {
             val messageId = cursorInbox.getString(0)
             contentResolver.query(
@@ -136,7 +136,7 @@ fun Context.getLatestMMS(callback: (String, String, List<Pair<ByteArray, String>
                 "${Mms.Part.MSG_ID} = ? AND ${Mms.Part.CONTENT_TYPE} = ?",
                 arrayOf(messageId, "text/plain"),
                 null
-            )?.let { cursorPart ->
+            )?.use { cursorPart ->
                 if (cursorPart.moveToNext()) {
                     val indexText = cursorPart.getColumnIndex(Mms.Part.TEXT)
                     text = cursorPart.getString(indexText)
@@ -147,7 +147,7 @@ fun Context.getLatestMMS(callback: (String, String, List<Pair<ByteArray, String>
                     null,
                     null,
                     null
-                )?.let { cursorAdr ->
+                )?.use { cursorAdr ->
                     if (cursorAdr.moveToNext()) {
                         subject = getSubject(R.string.subject_new_message, cursorAdr.getString(0))
                     }
@@ -157,7 +157,7 @@ fun Context.getLatestMMS(callback: (String, String, List<Pair<ByteArray, String>
                         "${Mms.Part.MSG_ID} = ? AND ${Mms.Part.CONTENT_TYPE} LIKE ?",
                         arrayOf(messageId, "image/%"),
                         null
-                    )?.let { cursorPartImage ->
+                    )?.use { cursorPartImage ->
                         while (cursorPartImage.moveToNext()) {
                             val partId = cursorPartImage.getString(0)
                             val contentType = cursorPartImage.getString(2)
@@ -174,14 +174,10 @@ fun Context.getLatestMMS(callback: (String, String, List<Pair<ByteArray, String>
                                 Log.e(TAG, "openInputStream()", e)
                             }
                         }
-                        cursorPartImage.close()
                     }
-                    cursorAdr.close()
                 }
-                cursorPart.close()
             }
         }
-        cursorInbox.close()
     }
     callback(subject, text, images)
 }
