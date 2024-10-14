@@ -43,13 +43,31 @@ class SmsReceivedBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
+    private val inbox = mutableMapOf<String, String>()
     private fun Context.handleSms(intent: Intent) {
         getMessagesFromIntent(intent)?.forEach { message ->
-            sendEmail(
-                subject = getSubject(R.string.subject_new_message, message.originatingAddress),
-                text = message.messageBody,
-                images = emptyList()
-            )
+            thread {
+                synchronized(inbox) {
+                    message.originatingAddress?.let { key ->
+                        val previous = if (inbox.containsKey(key)) inbox[key] else ""
+                        inbox[key] = "$previous${message.messageBody}"
+                    }
+                }
+                try {
+                    sleep(3000L)
+                } catch (e: InterruptedException) {/* nothing to do */
+                }
+                synchronized(inbox) {
+                    inbox.keys.forEach { originatingAddress ->
+                        sendEmail(
+                            subject = getSubject(R.string.subject_new_message, originatingAddress),
+                            text = inbox[originatingAddress] ?: "",
+                            images = emptyList()
+                        )
+                    }
+                    inbox.clear()
+                }
+            }
         }
     }
 
