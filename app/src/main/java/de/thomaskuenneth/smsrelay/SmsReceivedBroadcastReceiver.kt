@@ -30,48 +30,67 @@ import javax.mail.internet.MimeMultipart
 import javax.mail.util.ByteArrayDataSource
 import kotlin.concurrent.thread
 
+private val inbox = mutableMapOf<String, MutableList<Pair<Long, String>>>()
 
 class SmsReceivedBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
+        val result = goAsync()
         when (intent?.action) {
-            Telephony.Sms.Intents.SMS_RECEIVED_ACTION -> context.handleSms(intent)
-            Telephony.Sms.Intents.WAP_PUSH_RECEIVED_ACTION -> context.handleMms()
+            Telephony.Sms.Intents.SMS_RECEIVED_ACTION -> context.handleSms(result, intent)
+            Telephony.Sms.Intents.WAP_PUSH_RECEIVED_ACTION -> context.handleMms(result)
 
             else -> {
-                Log.e(TAG, "unexpected action")
+                Log.e(TAG, "unexpected action: ${intent?.action}")
+                result.finish()
             }
         }
     }
 
-    private val inbox = mutableMapOf<String, String>()
-    private fun Context.handleSms(intent: Intent) {
+    private fun Context.handleSms(result: PendingResult, intent: Intent) {
         getMessagesFromIntent(intent)?.forEach { message ->
+            val order = with(System.nanoTime()) {
+                message.userData?.let { userData ->
+                    if (userData.size > 5) {
+                        userData[5].toLong()
+                    } else this
+                } ?: this
+            }
             thread {
                 synchronized(inbox) {
                     message.originatingAddress?.let { key ->
-                        val previous = if (inbox.containsKey(key)) inbox[key] else ""
-                        inbox[key] = "$previous${message.messageBody}"
+                        val list = if (inbox.containsKey(key)) inbox[key]
+                            ?: mutableListOf() else mutableListOf()
+                        list.add(Pair(order, message.messageBody))
+                        inbox[key] = list
                     }
                 }
                 try {
                     sleep(3000L)
-                } catch (e: InterruptedException) {/* nothing to do */
+                } catch (e: InterruptedException) {
+                    Log.e(TAG, "handleSms()", e)
                 }
                 synchronized(inbox) {
-                    inbox.keys.forEach { originatingAddress ->
-                        sendEmail(
-                            subject = getSubject(R.string.subject_new_message, originatingAddress),
-                            text = inbox[originatingAddress] ?: "",
-                            images = emptyList()
-                        )
+                    if (inbox.isNotEmpty()) {
+                        inbox.keys.forEach { originatingAddress ->
+                            inbox[originatingAddress]?.let { list ->
+                                val sorted = list.sortedBy { it.first }
+                                val joinedMessage = sorted.joinToString { (_, second) -> second }
+                                sendEmail(
+                                    subject = getSubject(
+                                        R.string.subject_new_message, originatingAddress
+                                    ), text = joinedMessage, images = emptyList()
+                                )
+                            }
+                        }
+                        inbox.clear()
+                        result.finish()
                     }
-                    inbox.clear()
                 }
             }
         }
     }
 
-    private fun Context.handleMms() {
+    private fun Context.handleMms(result: PendingResult) {
         // This is hacky; we need to find a way to connect the id from the intent with
         // the content provider
         thread {
@@ -81,6 +100,7 @@ class SmsReceivedBroadcastReceiver : BroadcastReceiver() {
                     subject = subject, text = text, images = images
                 )
             }
+            result.finish()
         }
     }
 
