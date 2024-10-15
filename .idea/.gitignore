@@ -1,3 +1,20 @@
 # Default ignored files
 /shelf/
 /workspace.xml
+
+caches
+libraries
+modules.xml
+workspace.xml
+navEditor.xml
+assetWizardSettings.xml
+deploymentTargetSelector.xml
+inspectionProfiles/Project_Default.xml
+misc.xml
+migrations.xml
+kotlinc.xml
+gradle.xml
+compiler.xml
+vcs.xml
+studiobot.xml
+emulatorDisplays.xml
