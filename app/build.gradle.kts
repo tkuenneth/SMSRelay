@@ -32,6 +32,9 @@ android {
         buildConfigField("String", "SMTP_PASSWORD", "\"${properties["SMTP_PASSWORD"].toString()}\"")
         buildConfigField("String", "SMTP_FROM", "\"${properties["SMTP_FROM"].toString()}\"")
         buildConfigField("String", "SMTP_TO", "\"${properties["SMTP_TO"].toString()}\"")
+        buildConfigField("String", "TEST_NAME_01", "\"${properties["TEST_NAME_01"].toString()}\"")
+        buildConfigField("String", "TEST_PHONE_01", "\"${properties["TEST_PHONE_01"].toString()}\"")
+        buildConfigField("String", "TEST_PHONE_02", "\"${properties["TEST_PHONE_02"].toString()}\"")
     }
 
     buildTypes {
@@ -85,4 +88,6 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    androidTestImplementation(libs.androidx.rules)
 }

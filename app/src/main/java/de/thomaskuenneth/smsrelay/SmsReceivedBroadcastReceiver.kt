@@ -232,14 +232,14 @@ fun Context.getName(phoneNumber: String): String {
         ContactsContract.CommonDataKinds.Phone.NUMBER,
         ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
     )
-    val normalizedIncoming = PhoneNumberUtils.normalizeNumber(phoneNumber)
+    val normalizedIncoming = normalizePhoneNumber(phoneNumber)
     contentResolver.query(
         ContactsContract.CommonDataKinds.Phone.CONTENT_URI, projection, null, null, null
     )?.use { cursor ->
         while (cursor.moveToNext()) {
             val number =
                 cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))
-            val normalizedCurrent = PhoneNumberUtils.normalizeNumber(number)
+            val normalizedCurrent = normalizePhoneNumber(number)
             if (normalizedIncoming.contains(normalizedCurrent) || normalizedCurrent.contains(
                     normalizedIncoming
                 )
@@ -250,3 +250,8 @@ fun Context.getName(phoneNumber: String): String {
     }
     return phoneNumber
 }
+
+fun normalizePhoneNumber(phoneNumber: String) =
+    PhoneNumberUtils.normalizeNumber(phoneNumber).removeBlanks()
+
+fun String.removeBlanks() = replace(" ", "")
