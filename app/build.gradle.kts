@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+@Suppress("unused")
 val properties = Properties().apply {
     rootProject.file("local.properties").reader().use(::load)
 }
