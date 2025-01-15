@@ -8,6 +8,7 @@ import android.telephony.TelephonyManager
 
 const val KEY_INCOMING_NUMBER = "incomingNumber"
 
+@Suppress("DEPRECATION")
 class PhoneStateBroadcastReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent?) {
