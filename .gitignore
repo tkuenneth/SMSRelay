@@ -8,3 +8,14 @@
 .cxx
 local.properties
 **/Browse.plb
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+.navigation/
+captures/
+output.json
+*.hprof
+.cxx/
+kotlin-js-store/

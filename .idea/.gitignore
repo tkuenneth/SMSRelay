@@ -20,3 +20,6 @@ studiobot.xml
 emulatorDisplays.xml
 androidTestResultsUserPreferences.xml
 runConfigurations.xml
+AndroidProjectSystem.xml
+appInsightsSettings.xml
+deviceManager.xml

@@ -2,7 +2,6 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
 }
 
@@ -13,12 +12,12 @@ val properties = Properties().apply {
 
 android {
     namespace = "de.thomaskuenneth.smsrelay"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "de.thomaskuenneth.smsrelay"
         minSdk = 30
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 2
         versionName = "1.0"
 
@@ -51,18 +50,20 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
     }
     buildFeatures {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/NOTICE.md"
+            excludes += "/META-INF/LICENSE.md"
         }
     }
 }
